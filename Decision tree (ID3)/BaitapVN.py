@@ -1,97 +1,300 @@
+import pandas as pd
+import math
 import matplotlib.pyplot as plt
 
-# 1. TẠO KHUNG HÌNH
-fig, ax = plt.subplots(figsize=(12, 8))
+# 1. TẠO DỮ LIỆU
+data = {
+    "age": [
+        "<=30", "<=30", "31...40", ">40", ">40",
+        ">40", "31...40", "<=30", "<=30", ">40",
+        "<=30", "31...40", "31...40", ">40"
+    ],
 
-# Cho phép co giãn cửa sổ
-fig.canvas.manager.set_window_title("Cây quyết định ID3")
+    "income": [
+        "high", "high", "high", "medium", "low",
+        "low", "low", "medium", "low", "medium",
+        "medium", "medium", "high", "medium"
+    ],
 
-# 2. TẠO HÀM VẼ Ô
-def ve_o(x, y, text, mau):
-    ax.text(
-        x, y, text,
-        ha="center",
-        va="center",
-        fontsize=13,
-        fontweight="bold",
-        bbox=dict(
-            boxstyle="round,pad=0.5",
-            facecolor=mau,
-            edgecolor="black",
-            linewidth=1.5
+    "student": [
+        "no", "no", "no", "no", "yes",
+        "yes", "yes", "no", "yes", "yes",
+        "yes", "no", "yes", "no"
+    ],
+
+    "credit_rating": [
+        "fair", "excellent", "fair", "fair", "fair",
+        "excellent", "excellent", "fair", "fair", "fair",
+        "excellent", "excellent", "fair", "excellent"
+    ],
+
+    "buys_computer": [
+        "no", "no", "yes", "yes", "yes",
+        "no", "yes", "no", "yes", "yes",
+        "yes", "yes", "yes", "no"
+    ]
+}
+df = pd.DataFrame(data)
+
+# 2. TÍNH ENTROPY
+def entropy(data):
+    so_luong = data.value_counts()
+    tong = len(data)
+    H = 0
+    for n in so_luong:
+        p = n / tong
+        H = H - p * math.log2(p)
+
+    return H
+
+# 3. TÍNH INFORMATION GAIN
+def information_gain(df, attribute, target):
+
+    H_truoc = entropy(df[target])
+    H_sau = 0
+
+    for value in df[attribute].unique():
+
+        nhom = df[df[attribute] == value]
+
+        H_nhom = entropy(nhom[target])
+
+        trong_so = len(nhom) / len(df)
+
+        H_sau = H_sau + trong_so * H_nhom
+    gain = H_truoc - H_sau
+
+    return gain
+
+# 4. CHỌN THUỘC TÍNH TỐT NHẤT
+def chon_thuoc_tinh(df, attributes, target):
+
+    gain_lon_nhat = -1
+    thuoc_tinh_tot_nhat = None
+
+    for attribute in attributes:
+        gain = information_gain(
+            df,
+            attribute,
+            target
         )
+
+        print(
+            "Gain(", attribute, ") =",
+            round(gain, 3)
+        )
+
+        if gain > gain_lon_nhat:
+
+            gain_lon_nhat = gain
+            thuoc_tinh_tot_nhat = attribute
+    return thuoc_tinh_tot_nhat
+
+# 5. THUẬT TOÁN ID3
+def ID3(df, attributes, target):
+
+    # Nếu tất cả mẫu cùng một lớp
+    if len(df[target].unique()) == 1:
+
+        return df[target].iloc[0]
+
+    # Nếu không còn thuộc tính
+    if len(attributes) == 0:
+
+        return df[target].mode()[0]
+
+    # Chọn thuộc tính tốt nhất
+    best_attribute = chon_thuoc_tinh(
+        df,
+        attributes,
+        target
+    )
+    print("=> Chọn:", best_attribute)
+
+    # Tạo cây
+    tree = {}
+
+    tree[best_attribute] = {}
+
+    # Các thuộc tính còn lại
+    attributes_con_lai = []
+
+    for attribute in attributes:
+
+        if attribute != best_attribute:
+
+            attributes_con_lai.append(attribute)
+
+    # Tạo các nhánh
+    for value in df[best_attribute].unique():
+
+        nhom = df[
+            df[best_attribute] == value
+        ]
+        if len(nhom) == 0:
+
+            tree[best_attribute][value] = \
+                df[target].mode()[0]
+        else:
+            tree[best_attribute][value] = ID3(
+                nhom,
+                attributes_con_lai,
+                target
+            )
+    return tree
+
+# 6. CHẠY ID3
+attributes = [
+    "age",
+    "income",
+    "student",
+    "credit_rating"
+]
+print("================================")
+print("        ENTROPY BAN ĐẦU")
+print("================================")
+H = entropy(df["buys_computer"])
+
+print("Entropy =", round(H, 3))
+print("\n================================")
+print("      INFORMATION GAIN")
+print("================================")
+
+for attribute in attributes:
+    gain = information_gain(
+        df,
+        attribute,
+        "buys_computer"
+    )
+    print(
+        attribute,
+        "=",
+        round(gain, 3)
     )
 
-# 3. VẼ CÁC NÚT
-# Nút gốc
-ve_o(0.5, 0.9, "age", "lightblue")
-
-# Tầng 2
-ve_o(0.25, 0.65, "student", "lightblue")
-ve_o(0.5, 0.65, "YES", "lightgreen")
-ve_o(0.75, 0.65, "credit_rating", "lightblue")
-
-# Tầng cuối
-ve_o(0.15, 0.35, "NO", "lightcoral")
-ve_o(0.35, 0.35, "YES", "lightgreen")
-
-ve_o(0.65, 0.35, "YES", "lightgreen")
-ve_o(0.85, 0.35, "NO", "lightcoral")
-
-# 4. VẼ MŨI TÊN
-def mui_ten(x1, y1, x2, y2):
-    ax.annotate(
-        "",
-        xy=(x2, y2),
-        xytext=(x1, y1),
-        arrowprops=dict(
-            arrowstyle="->",
-            linewidth=1.5,
-            color="black"
-        )
-    )
-
-# age → các nhánh
-mui_ten(0.5, 0.87, 0.25, 0.69)
-mui_ten(0.5, 0.87, 0.5, 0.69)
-mui_ten(0.5, 0.87, 0.75, 0.69)
-
-# student → kết quả
-mui_ten(0.25, 0.62, 0.15, 0.39)
-mui_ten(0.25, 0.62, 0.35, 0.39)
-
-# credit_rating → kết quả
-mui_ten(0.75, 0.62, 0.65, 0.39)
-mui_ten(0.75, 0.62, 0.85, 0.39)
-
-
-# 5. GHI GIÁ TRỊ TRÊN NHÁNH
-ax.text(0.35, 0.80, "<=30", fontsize=11)
-ax.text(0.52, 0.80, "31...40", fontsize=11)
-ax.text(0.66, 0.80, ">40", fontsize=11)
-
-ax.text(0.18, 0.51, "no", fontsize=11)
-ax.text(0.31, 0.51, "yes", fontsize=11)
-
-ax.text(0.68, 0.51, "fair", fontsize=11)
-ax.text(0.80, 0.51, "excellent", fontsize=11)
-
-# 6. TIÊU ĐỀ
-ax.set_title(
-    "CÂY QUYẾT ĐỊNH ID3",
-    fontsize=20,
-    fontweight="bold",
-    pad=20
+print("\n================================")
+print("          XÂY CÂY ID3")
+print("================================")
+cay = ID3(
+    df,
+    attributes,
+    "buys_computer"
 )
 
-# 7. CHỈNH KHUNG
-ax.set_xlim(0, 1)
-ax.set_ylim(0.2, 1)
+
+# 7. VẼ CÂY
+fig, ax = plt.subplots(figsize=(14, 8))
 
 ax.axis("off")
 
-# 8. HIỂN THỊ
-plt.tight_layout()
+def ve_cay(
+    tree,
+    x,
+    y,
+    dx,
+    parent=None,
+    text=""
+):
+    # Nếu là lá YES / NO
+    if not isinstance(tree, dict):
+        ax.text(
+            x,
+            y,
+            tree.upper(),
+            fontsize=13,
+            ha="center",
+            va="center",
+            bbox=dict(
+                boxstyle="round",
+                facecolor="lightgreen"
+            )
+        )
+        if parent is not None:
+
+            ax.plot(
+                [parent[0], x],
+                [parent[1], y],
+                "k-"
+            )
+            ax.text(
+                (parent[0] + x) / 2,
+                (parent[1] + y) / 2,
+                text,
+                fontsize=11,
+                ha="center"
+            )
+        return
+
+    # Lấy tên thuộc tính
+    attribute = list(tree.keys())[0]
+
+    # Vẽ nút
+    ax.text(
+        x,
+        y,
+        attribute,
+        fontsize=13,
+        ha="center",
+        va="center",
+        bbox=dict(
+            boxstyle="round",
+            facecolor="lightblue"
+        )
+    )
+    # Nối với nút cha
+    if parent is not None:
+
+        ax.plot(
+            [parent[0], x],
+            [parent[1], y],
+            "k-"
+        )
+
+        ax.text(
+            (parent[0] + x) / 2,
+            (parent[1] + y) / 2,
+            text,
+            fontsize=11,
+            ha="center"
+        )
+
+    # Lấy các nhánh
+    branches = tree[attribute]
+
+    so_nhanh = len(branches)
+
+    khoang_cach = dx * 2
+
+    start_x = x - (
+        (so_nhanh - 1) * khoang_cach / 2
+    )
+    i = 0
+
+    for value in branches:
+        child_x = start_x + i * khoang_cach
+        child_y = y - 2
+
+        ve_cay(
+            branches[value],
+            child_x,
+            child_y,
+            dx / 2,
+            (x, y),
+            str(value)
+        )
+        i = i + 1
+
+# Vẽ cây
+ve_cay(
+    cay,
+    0,
+    0,
+    2
+)
+
+# Tiêu đề
+plt.title(
+    "Cây quyết định ID3",
+    fontsize=18
+)
 plt.show()
-
-
